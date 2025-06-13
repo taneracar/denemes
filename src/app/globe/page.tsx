@@ -62,7 +62,7 @@ const locations: Location[] = [
 ];
 
 const continents = {
-  Europe: { lat: 54, lng: 15, altitude: 2 },
+  Europe: { lat: 28, lng: 15, altitude: 2 },
   Asia: { lat: 34, lng: 100, altitude: 2 },
   America: { lat: 37, lng: -95, altitude: 2 },
   Africa: { lat: 0, lng: 20, altitude: 2 },
@@ -118,9 +118,9 @@ const GlobeComponent = () => {
       if (globeEl.current) {
         const controls = globeEl.current.controls();
         if (controls) {
-          controls.enableZoom = true;
+          controls.enableZoom = false;
           controls.autoRotate = false;
-          controls.enableRotate = true;
+          controls.enableRotate = false;
           controls.update();
         }
       }
@@ -132,6 +132,8 @@ const GlobeComponent = () => {
   const ringsToShow = locations.filter(
     (loc) => loc.continent === selectedContinent
   );
+
+  let dirIndex = 0;
 
   const customThreeObject = (d: object) => {
     const loc = d as Location;
@@ -146,12 +148,23 @@ const GlobeComponent = () => {
     const z = radius * Math.sin(phi) * Math.sin(theta);
     const position = new THREE.Vector3(x, y, z);
 
-    // Yüzey normale göre tangent yön
-    const normal = position.clone().normalize();
-    const dir = new THREE.Vector3(normal.z, 0, -normal.x).normalize();
-
     const origin = position.clone();
-    const length = 150;
+
+    // 📌 Dört köşeye doğru yönler tanımla
+    const directions = [
+      new THREE.Vector3(1, 0.8, 1), // sağ üst
+      new THREE.Vector3(-1, 1, 1), // sol üst
+      new THREE.Vector3(-1, -0.1, 1), // sol alt (hafif yukarı)
+      new THREE.Vector3(1, -0.1, 1), // sağ alt
+    ];
+
+    // 📏 Her indexe özel uzunluklar tanımla
+    const lengths = [100, 75, 100, 110]; // sırayla kullanılacak uzunluklar
+
+    const dir = directions[dirIndex % directions.length].clone().normalize();
+    const length = lengths[dirIndex % lengths.length];
+    dirIndex++;
+
     const hex = 0xde271f;
 
     // Çubuğu oluştur
@@ -163,13 +176,13 @@ const GlobeComponent = () => {
     );
     rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone());
 
-    // Ucuna kırmızı nokta (küre) ekle
+    // Nokta
     const dotGeometry = new THREE.SphereGeometry(2, 16, 16);
     const dotMaterial = new THREE.MeshBasicMaterial({ color: hex });
     const dot = new THREE.Mesh(dotGeometry, dotMaterial);
     dot.position.copy(origin.clone().add(dir.clone().multiplyScalar(length)));
 
-    // Yazı için canvas ve sprite
+    // Yazı
     const canvas = document.createElement("canvas");
     const size = 256;
     canvas.width = size;
@@ -186,13 +199,13 @@ const GlobeComponent = () => {
       transparent: true,
     });
     const sprite = new THREE.Sprite(spriteMaterial);
-
+    const spriteXOffsets = [0, 0, 0, 0]; // Her çubuk için manuel X offset
+    const xOffset = spriteXOffsets[dirIndex % spriteXOffsets.length];
     sprite.position.copy(
-      origin.clone().add(dir.clone().multiplyScalar(length + 5))
+      dot.position.clone().add(new THREE.Vector3(xOffset, -5, 0))
     );
     sprite.scale.set(20, 5, 1);
 
-    // Group içine çubuk, nokta ve yazıyı koy
     const group = new THREE.Group();
     group.add(rod);
     group.add(dot);
