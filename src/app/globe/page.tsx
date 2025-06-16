@@ -3,8 +3,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
 import type { GlobeMethods } from "react-globe.gl";
-
 import dynamic from "next/dynamic";
+
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false });
 
 interface Location {
@@ -24,8 +24,8 @@ const locations: Location[] = [
     continent: "Europe",
     lat: 52.52,
     lng: 13.405,
-    subtitle: "Berlin Headquarters",
-    items: ["Engineering", "Design", "Marketing"],
+    subtitle: "Berlin HQ",
+    items: ["Engineering", "Marketing"],
   },
   {
     id: 9,
@@ -94,11 +94,13 @@ const getData = async () => {
 };
 
 const GlobeComponent = () => {
-  const globeEl = useRef<GlobeMethods | undefined>(undefined);
+  const globeEl = useRef<GlobeMethods>();
   const [hexData, setHexData] = useState([]);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [selectedContinent, setSelectedContinent] =
-    useState<keyof typeof continents>("Europe");
+  const [selectedContinent, setSelectedContinent] = useState<
+    keyof typeof continents | null
+  >(null);
+  const [showDetailed, setShowDetailed] = useState(false); // sadece kıta seçilince true olur
 
   useEffect(() => {
     getData().then((geoData) => {
@@ -113,10 +115,7 @@ const GlobeComponent = () => {
     });
 
     const handleResize = () => {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+      setDimensions({ width: window.innerWidth, height: window.innerHeight });
     };
 
     window.addEventListener("resize", handleResize);
@@ -130,31 +129,36 @@ const GlobeComponent = () => {
     }
   }, [selectedContinent]);
 
+  // Kontrolleri dinle: kullanıcı hareket ederse kıta iptal, detay kapat
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (globeEl.current) {
-        const controls = globeEl.current.controls();
-        if (controls) {
-          controls.enableZoom = false;
-          controls.autoRotate = false;
-          controls.enableRotate = false;
-          controls.update();
-        }
+      const controls = globeEl.current?.controls();
+      if (controls) {
+        controls.enableZoom = true;
+        controls.autoRotate = false;
+        controls.enableRotate = true;
+
+        const onStart = () => {
+          setSelectedContinent(null);
+          setShowDetailed(false); // sadece ring göster
+        };
+
+        controls.addEventListener("start", onStart);
       }
     }, 500);
-
     return () => clearTimeout(timeout);
   }, []);
 
-  const ringsToShow = locations.filter(
-    (loc) => loc.continent === selectedContinent
-  );
+  const displayedLocations = selectedContinent
+    ? locations.filter((loc) => loc.continent === selectedContinent)
+    : locations;
 
   let dirIndex = 0;
 
   const customThreeObject = (d: object) => {
-    const loc = d as Location;
+    if (!showDetailed) return undefined; // eğer detay gösterilmeyecekse çubuk/text yok
 
+    const loc = d as Location;
     const phi = (90 - loc.lat) * (Math.PI / 180);
     const theta = (loc.lng + 90) * (Math.PI / 180);
     const radius = 100;
@@ -171,7 +175,6 @@ const GlobeComponent = () => {
       new THREE.Vector3(-1, -0.1, 1),
       new THREE.Vector3(1, -0.1, 1),
     ];
-
     const lengths = [100, 75, 100, 110];
     const spriteXOffsets = [2, 0, 0, 3];
 
@@ -195,7 +198,6 @@ const GlobeComponent = () => {
     const dot = new THREE.Mesh(dotGeometry, dotMaterial);
     dot.position.copy(origin.clone().add(dir.clone().multiplyScalar(length)));
 
-    // 🎨 Yazı: Ülke adı + alt başlık + liste
     const canvas = document.createElement("canvas");
     const size = 512;
     canvas.width = size;
@@ -247,13 +249,14 @@ const GlobeComponent = () => {
         {Object.keys(continents).map((continent) => (
           <button
             key={continent}
-            onClick={() =>
-              setSelectedContinent(continent as keyof typeof continents)
-            }
+            onClick={() => {
+              setSelectedContinent(continent as keyof typeof continents);
+              setShowDetailed(true); // sadece bu durumda çubuk/metin göster
+            }}
             className={`px-4 py-2 rounded-md font-semibold ${
               selectedContinent === continent
                 ? "bg-purple-600 text-white"
-                : "bg-white-300 text-black"
+                : "bg-white text-black"
             }`}
           >
             {continent}
@@ -273,11 +276,11 @@ const GlobeComponent = () => {
           hexPolygonUseDots={true}
           hexPolygonColor={() => "rgba(128, 128, 128, 0.2)"}
           backgroundColor="white"
-          ringsData={ringsToShow}
+          ringsData={displayedLocations}
           ringColor={() => "#de271f"}
           showAtmosphere={false}
           showGlobe={true}
-          customLayerData={ringsToShow}
+          customLayerData={displayedLocations}
           customThreeObject={customThreeObject}
         />
       </div>
