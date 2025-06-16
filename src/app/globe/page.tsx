@@ -5,6 +5,7 @@ import * as THREE from "three";
 import type { GlobeMethods } from "react-globe.gl";
 import dynamic from "next/dynamic";
 import gsap from "gsap";
+
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false });
 
 interface Location {
@@ -100,7 +101,8 @@ const GlobeComponent = () => {
   const [selectedContinent, setSelectedContinent] = useState<
     keyof typeof continents | null
   >(null);
-  const [showDetailed, setShowDetailed] = useState(false); // sadece kıta seçilince true olur
+  const [showDetailed, setShowDetailed] = useState(false);
+  const objectRefs = useRef<THREE.Group[]>([]);
 
   useEffect(() => {
     getData().then((geoData) => {
@@ -129,18 +131,48 @@ const GlobeComponent = () => {
     }
   }, [selectedContinent]);
 
-  // Kontrolleri dinle: kullanıcı hareket ederse kıta iptal, detay kapat
+  const fadeOutObjects = (): Promise<void> => {
+    return new Promise((resolve) => {
+      const total = objectRefs.current.length;
+      if (total === 0) return resolve();
+
+      let completed = 0;
+
+      objectRefs.current.forEach((group) => {
+        group.children.forEach((child) => {
+          if (child instanceof THREE.Mesh || child instanceof THREE.Sprite) {
+            gsap.to(child.scale, {
+              x: 0,
+              y: 0,
+              z: 0,
+              duration: 0.6,
+              ease: "power2.inOut",
+              onComplete: () => {
+                completed++;
+                if (completed === total) {
+                  objectRefs.current = [];
+                  resolve();
+                }
+              },
+            });
+          }
+        });
+      });
+    });
+  };
+
   useEffect(() => {
     const timeout = setTimeout(() => {
       const controls = globeEl.current?.controls();
       if (controls) {
-        controls.enableZoom = true;
+        controls.enableZoom = false;
         controls.autoRotate = false;
         controls.enableRotate = true;
 
-        const onStart = () => {
+        const onStart = async () => {
+          await fadeOutObjects();
           setSelectedContinent(null);
-          setShowDetailed(false); // sadece ring göster
+          setShowDetailed(false);
         };
 
         controls.addEventListener("start", onStart);
@@ -166,8 +198,7 @@ const GlobeComponent = () => {
     const x = -radius * Math.sin(phi) * Math.cos(theta);
     const y = radius * Math.cos(phi);
     const z = radius * Math.sin(phi) * Math.sin(theta);
-    const position = new THREE.Vector3(x, y, z);
-    const origin = position.clone();
+    const origin = new THREE.Vector3(x, y, z);
 
     const directions = [
       new THREE.Vector3(1, 0.8, 1),
@@ -185,7 +216,6 @@ const GlobeComponent = () => {
 
     const hex = 0xde271f;
 
-    // Rod
     const rodGeometry = new THREE.CylinderGeometry(0.2, 0.2, length, 8);
     const rodMaterial = new THREE.MeshBasicMaterial({ color: hex });
     const rod = new THREE.Mesh(rodGeometry, rodMaterial);
@@ -193,16 +223,14 @@ const GlobeComponent = () => {
       origin.clone().add(dir.clone().multiplyScalar(length / 2))
     );
     rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone());
-    rod.scale.set(1, 0, 1); // y: 0'dan başlat (animasyon için)
+    rod.scale.set(1, 0, 1);
 
-    // Dot
     const dotGeometry = new THREE.SphereGeometry(2, 16, 16);
     const dotMaterial = new THREE.MeshBasicMaterial({ color: hex });
     const dot = new THREE.Mesh(dotGeometry, dotMaterial);
     dot.position.copy(origin.clone().add(dir.clone().multiplyScalar(length)));
-    dot.scale.set(0, 0, 0); // animasyon için
+    dot.scale.set(0, 0, 0);
 
-    // Sprite (Canvas)
     const canvas = document.createElement("canvas");
     const size = 512;
     canvas.width = size;
@@ -238,14 +266,15 @@ const GlobeComponent = () => {
     sprite.position.copy(
       dot.position.clone().add(new THREE.Vector3(xOffset, -8, 0))
     );
-    sprite.scale.set(0, 0, 0); // animasyon için
+    sprite.scale.set(0, 0, 0);
 
     const group = new THREE.Group();
     group.add(rod);
     group.add(dot);
     group.add(sprite);
 
-    // ✨ Animasyonları başlat
+    objectRefs.current.push(group);
+
     gsap.to(rod.scale, { y: 1, duration: 1, ease: "power2.inOut" });
     gsap.to(dot.scale, {
       x: 1,
@@ -273,9 +302,10 @@ const GlobeComponent = () => {
         {Object.keys(continents).map((continent) => (
           <button
             key={continent}
-            onClick={() => {
+            onClick={async () => {
+              await fadeOutObjects();
               setSelectedContinent(continent as keyof typeof continents);
-              setShowDetailed(true); // sadece bu durumda çubuk/metin göster
+              setShowDetailed(true);
             }}
             className={`px-4 py-2 rounded-md font-semibold ${
               selectedContinent === continent
