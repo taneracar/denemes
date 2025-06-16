@@ -2,27 +2,39 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
-//import Globe from "react-globe.gl";
 import type { GlobeMethods } from "react-globe.gl";
 
 import dynamic from "next/dynamic";
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false });
+
 interface Location {
   id: number;
   country: string;
   continent: string;
   lat: number;
   lng: number;
+  subtitle?: string;
+  items?: string[];
 }
 
 const locations: Location[] = [
-  { id: 1, country: "Germany", continent: "Europe", lat: 52.52, lng: 13.405 },
+  {
+    id: 1,
+    country: "Germany",
+    continent: "Europe",
+    lat: 52.52,
+    lng: 13.405,
+    subtitle: "Berlin Headquarters",
+    items: ["Engineering", "Design", "Marketing"],
+  },
   {
     id: 9,
-    country: "England", // Birleşik Krallık olarak geçiyor burada
+    country: "England",
     continent: "Europe",
     lat: 51.5074,
     lng: -0.1278,
+    subtitle: "London Office",
+    items: ["Sales", "Support"],
   },
   {
     id: 11,
@@ -30,6 +42,7 @@ const locations: Location[] = [
     continent: "Europe",
     lat: 55.7558,
     lng: 37.6176,
+    subtitle: "Moscow Team",
   },
   {
     id: 14,
@@ -37,6 +50,8 @@ const locations: Location[] = [
     continent: "America",
     lat: 37.0902,
     lng: -95.7129,
+    subtitle: "NY Hub",
+    items: ["HR", "Legal"],
   },
   {
     id: 15,
@@ -51,6 +66,7 @@ const locations: Location[] = [
     continent: "Africa",
     lat: 30.0444,
     lng: 31.2357,
+    subtitle: "Cairo Dev Center",
   },
   {
     id: 17,
@@ -58,6 +74,8 @@ const locations: Location[] = [
     continent: "Asia",
     lat: 38.9637,
     lng: 35.2433,
+    subtitle: "Istanbul Lab",
+    items: ["Frontend", "Backend", "QA"],
   },
 ];
 
@@ -85,7 +103,6 @@ const GlobeComponent = () => {
   useEffect(() => {
     getData().then((geoData) => {
       setHexData(geoData.features);
-      console.log(geoData.features);
     });
   }, []);
 
@@ -138,7 +155,6 @@ const GlobeComponent = () => {
   const customThreeObject = (d: object) => {
     const loc = d as Location;
 
-    // LatLng -> 3D coordinate dönüşümü
     const phi = (90 - loc.lat) * (Math.PI / 180);
     const theta = (loc.lng + 90) * (Math.PI / 180);
     const radius = 100;
@@ -147,27 +163,25 @@ const GlobeComponent = () => {
     const y = radius * Math.cos(phi);
     const z = radius * Math.sin(phi) * Math.sin(theta);
     const position = new THREE.Vector3(x, y, z);
-
     const origin = position.clone();
 
-    // 📌 Dört köşeye doğru yönler tanımla
     const directions = [
-      new THREE.Vector3(1, 0.8, 1), // sağ üst
-      new THREE.Vector3(-1, 1, 1), // sol üst
-      new THREE.Vector3(-1, -0.1, 1), // sol alt (hafif yukarı)
-      new THREE.Vector3(1, -0.1, 1), // sağ alt
+      new THREE.Vector3(1, 0.8, 1),
+      new THREE.Vector3(-1, 1, 1),
+      new THREE.Vector3(-1, -0.1, 1),
+      new THREE.Vector3(1, -0.1, 1),
     ];
 
-    // 📏 Her indexe özel uzunluklar tanımla
-    const lengths = [100, 75, 100, 110]; // sırayla kullanılacak uzunluklar
+    const lengths = [100, 75, 100, 110];
+    const spriteXOffsets = [2, 0, 0, 3];
 
     const dir = directions[dirIndex % directions.length].clone().normalize();
     const length = lengths[dirIndex % lengths.length];
+    const xOffset = spriteXOffsets[dirIndex % spriteXOffsets.length];
     dirIndex++;
 
     const hex = 0xde271f;
 
-    // Çubuğu oluştur
     const rodGeometry = new THREE.CylinderGeometry(0.2, 0.2, length, 8);
     const rodMaterial = new THREE.MeshBasicMaterial({ color: hex });
     const rod = new THREE.Mesh(rodGeometry, rodMaterial);
@@ -176,22 +190,37 @@ const GlobeComponent = () => {
     );
     rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone());
 
-    // Nokta
     const dotGeometry = new THREE.SphereGeometry(2, 16, 16);
     const dotMaterial = new THREE.MeshBasicMaterial({ color: hex });
     const dot = new THREE.Mesh(dotGeometry, dotMaterial);
     dot.position.copy(origin.clone().add(dir.clone().multiplyScalar(length)));
 
-    // Yazı
+    // 🎨 Yazı: Ülke adı + alt başlık + liste
     const canvas = document.createElement("canvas");
-    const size = 256;
+    const size = 512;
     canvas.width = size;
-    canvas.height = 64;
+    canvas.height = 256;
     const ctx = canvas.getContext("2d")!;
-    ctx.font = "36px Arial";
+    let yy = 50;
+
+    ctx.font = "bold 36px Arial";
     ctx.fillStyle = "#000000";
     ctx.textAlign = "center";
-    ctx.fillText(loc.country, size / 2, 48);
+    ctx.fillText(loc.country, size / 2, yy);
+
+    if (loc.subtitle) {
+      ctx.font = "italic 28px Arial";
+      yy += 40;
+      ctx.fillText(loc.subtitle, size / 2, yy);
+    }
+
+    if (loc.items?.length) {
+      ctx.font = "24px Arial";
+      loc.items.forEach((item) => {
+        yy += 30;
+        ctx.fillText(`• ${item}`, size / 2, yy);
+      });
+    }
 
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMaterial = new THREE.SpriteMaterial({
@@ -199,12 +228,10 @@ const GlobeComponent = () => {
       transparent: true,
     });
     const sprite = new THREE.Sprite(spriteMaterial);
-    const spriteXOffsets = [0, 0, 0, 0]; // Her çubuk için manuel X offset
-    const xOffset = spriteXOffsets[dirIndex % spriteXOffsets.length];
     sprite.position.copy(
-      dot.position.clone().add(new THREE.Vector3(xOffset, -5, 0))
+      dot.position.clone().add(new THREE.Vector3(xOffset, -8, 0))
     );
-    sprite.scale.set(20, 5, 1);
+    sprite.scale.set(25, 12, 1);
 
     const group = new THREE.Group();
     group.add(rod);
@@ -213,8 +240,6 @@ const GlobeComponent = () => {
 
     return group;
   };
-
-  // Eğer güncellemek istersek (mesela animasyon vs) burada yapabiliriz
 
   return (
     <>
@@ -249,13 +274,6 @@ const GlobeComponent = () => {
           hexPolygonColor={() => "rgba(128, 128, 128, 0.2)"}
           backgroundColor="white"
           ringsData={ringsToShow}
-          arcColor={(arc: any) => arc.color}
-          arcStroke={0.6}
-          arcDashLength={1}
-          arcDashGap={1}
-          arcDashInitialGap={() => Math.random()}
-          arcDashAnimateTime={1600}
-          arcAltitudeAutoScale={0.4}
           ringColor={() => "#de271f"}
           showAtmosphere={false}
           showGlobe={true}
