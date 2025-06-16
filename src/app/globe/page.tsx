@@ -238,19 +238,20 @@ const GlobeComponent = () => {
     const ctx = canvas.getContext("2d")!;
     let yy = 50;
 
-    ctx.font = "bold 36px Arial";
+    ctx.font = "bold 48px Arial";
+
     ctx.fillStyle = "#000000";
     ctx.textAlign = "center";
     ctx.fillText(loc.country, size / 2, yy);
 
     if (loc.subtitle) {
-      ctx.font = "italic 28px Arial";
+      ctx.font = "bold 36px Arial";
       yy += 40;
       ctx.fillText(loc.subtitle, size / 2, yy);
     }
 
     if (loc.items?.length) {
-      ctx.font = "24px Arial";
+      ctx.font = "italic 20px Arial";
       loc.items.forEach((item) => {
         yy += 30;
         ctx.fillText(`• ${item}`, size / 2, yy);
@@ -303,14 +304,15 @@ const GlobeComponent = () => {
           <button
             key={continent}
             onClick={async () => {
+              if (selectedContinent === continent) return;
               await fadeOutObjects();
               setSelectedContinent(continent as keyof typeof continents);
               setShowDetailed(true);
             }}
-            className={`px-4 py-2 rounded-md font-semibold ${
+            className={`px-4 py-2 rounded-md font-semibold transition-all cursor-pointer ${
               selectedContinent === continent
                 ? "bg-purple-600 text-white"
-                : "bg-white text-black"
+                : "bg-white text-black hover:bg-gray-200"
             }`}
           >
             {continent}
