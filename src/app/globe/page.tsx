@@ -338,6 +338,18 @@ const GlobeComponent = () => {
           showGlobe={true}
           customLayerData={displayedLocations}
           customThreeObject={customThreeObject}
+          pointsData={displayedLocations}
+          pointAltitude={0}
+          pointRadius={1.6}
+          pointColor={"rgba(0.0.0.0"}
+          onPointHover={(point) => {
+            // cursor'ı değiştir
+            document.body.style.cursor = point ? "pointer" : "default";
+
+            if (point) {
+              console.log("Hovered:", point);
+            }
+          }}
         />
       </div>
     </>
