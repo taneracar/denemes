@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
 import type { GlobeMethods } from "react-globe.gl";
 import dynamic from "next/dynamic";
-
+import gsap from "gsap";
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false });
 
 interface Location {
@@ -156,7 +156,7 @@ const GlobeComponent = () => {
   let dirIndex = 0;
 
   const customThreeObject = (d: object) => {
-    if (!showDetailed) return undefined; // eğer detay gösterilmeyecekse çubuk/text yok
+    if (!showDetailed) return undefined;
 
     const loc = d as Location;
     const phi = (90 - loc.lat) * (Math.PI / 180);
@@ -185,6 +185,7 @@ const GlobeComponent = () => {
 
     const hex = 0xde271f;
 
+    // Rod
     const rodGeometry = new THREE.CylinderGeometry(0.2, 0.2, length, 8);
     const rodMaterial = new THREE.MeshBasicMaterial({ color: hex });
     const rod = new THREE.Mesh(rodGeometry, rodMaterial);
@@ -192,12 +193,16 @@ const GlobeComponent = () => {
       origin.clone().add(dir.clone().multiplyScalar(length / 2))
     );
     rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone());
+    rod.scale.set(1, 0, 1); // y: 0'dan başlat (animasyon için)
 
+    // Dot
     const dotGeometry = new THREE.SphereGeometry(2, 16, 16);
     const dotMaterial = new THREE.MeshBasicMaterial({ color: hex });
     const dot = new THREE.Mesh(dotGeometry, dotMaterial);
     dot.position.copy(origin.clone().add(dir.clone().multiplyScalar(length)));
+    dot.scale.set(0, 0, 0); // animasyon için
 
+    // Sprite (Canvas)
     const canvas = document.createElement("canvas");
     const size = 512;
     canvas.width = size;
@@ -233,12 +238,31 @@ const GlobeComponent = () => {
     sprite.position.copy(
       dot.position.clone().add(new THREE.Vector3(xOffset, -8, 0))
     );
-    sprite.scale.set(25, 12, 1);
+    sprite.scale.set(0, 0, 0); // animasyon için
 
     const group = new THREE.Group();
     group.add(rod);
     group.add(dot);
     group.add(sprite);
+
+    // ✨ Animasyonları başlat
+    gsap.to(rod.scale, { y: 1, duration: 1, ease: "power2.inOut" });
+    gsap.to(dot.scale, {
+      x: 1,
+      y: 1,
+      z: 1,
+      duration: 1,
+      ease: "back.inOut(1.7)",
+      delay: 0.2,
+    });
+    gsap.to(sprite.scale, {
+      x: 25,
+      y: 12,
+      z: 1,
+      duration: 1,
+      ease: "back.inOut(1.5)",
+      delay: 0.4,
+    });
 
     return group;
   };
