@@ -95,7 +95,8 @@ const getData = async () => {
 };
 
 const GlobeComponent = () => {
-  const globeEl = useRef<GlobeMethods>();
+  const globeEl = useRef<GlobeMethods | undefined>(undefined);
+
   const [hexData, setHexData] = useState([]);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [selectedContinent, setSelectedContinent] = useState<
@@ -188,7 +189,7 @@ const GlobeComponent = () => {
   let dirIndex = 0;
 
   const customThreeObject = (d: object) => {
-    if (!showDetailed) return undefined;
+    if (!showDetailed) return new THREE.Group();
 
     const loc = d as Location;
     const phi = (90 - loc.lat) * (Math.PI / 180);

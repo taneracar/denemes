@@ -1,6 +1,6 @@
-//import ScrollAnimation from "@/components/ustUsteGelme/ScrollAnimation";
+import ScrollAnimation from "@/components/ustUsteGelme/ScrollAnimation";
 
-import ScrollAnimation from "@/components/stacking";
+//import ScrollAnimation from "@/components/stacking";
 
 export default function Home() {
   return (
@@ -10,8 +10,8 @@ export default function Home() {
           Taner
         </h1>
       </div>
-      {/* <ScrollAnimation /> */}
       <ScrollAnimation />
+      {/* <ScrollAnimation /> */}
     </>
   );
 }
